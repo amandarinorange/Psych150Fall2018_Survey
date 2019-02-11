@@ -1,0 +1,458 @@
+---
+title: "Psych150 Fall 2018 Data Analyses"
+by Stephen Antonoplis	  antonoplis@berkeley.edu	
+co-opted and modified by Amanda Wang
+output: html_notebook
+---
+
+Data Cleaning
+
+```{r}
+#clear the environment
+rm(list=ls())
+library(dplyr)
+## get the data
+
+#data <- read.csv('/Users/Amanda/Dropbox/Psych150_Fall2018/Survey/Psych150Fa18qualtricssurvey.csv',stringsAsFactors=F)
+
+data <- read.csv('/Users/Amanda/Dropbox/Psych150_Fall2018/Survey/Psych150Fa18qualtricssurvey.csv',stringsAsFactors=F)
+
+View(data)
+
+#choose the columns that contain numeric values and convert from characters
+nums <- c(14,16:17,20:29,31:196,198)
+  for (i in 1:length(nums)) 
+    {data[,nums[i]] <- as.numeric(as.character(data[,nums[i]]))}
+
+colnames(data)
+
+## flag bad responses
+# remove Ps who didn't finish
+
+data.fin <- data[data$V10 == 1,]
+
+# remove duplicate SIDs (retain first complete)
+data.fin$Intro_2_TEXT <- as.character(data.fin$Intro_2_TEXT)
+
+doop <- data.fin[duplicated(data.fin$Intro_2_TEXT)|
+                   duplicated(data.fin$Intro_2_TEXT,fromLast=T),c(12,10)]
+
+duplicated(data.fin$Intro_2_TEXT)
+
+#return list of all duplicates, including their first and last entries
+doop$row <- which(data.fin$Intro_2_TEXT %in% doop$Intro_2_TEXT) #rows 148 and 212 are from the same student, duplicated. Remove row-name 212, row POSITION 209, from data.fin, studentID 3033739674
+
+View(data.fin[c(210),])
+data.fin2 <- data.fin[-c(210),]
+View(data.fin2)
+
+nrow(data.fin2) # n = 238
+
+duplicated(data.fin2$Intro_2_TEXT) # great, done		
+
+
+# remove attn check fails (pass 3 out of 5)
+colnames(data.fin2) 
+for (i in 1:nrow(data.fin2)) {
+  data.fin2$attn[i] <- sum(c(data.fin2$AttCheck7[i]==7,
+                             data.fin2$AttCheck7.1[i]==7,
+                             data.fin2$AttCheck6[i]==6,
+                             data.fin2$AttCheck2[i]==2,
+                             data.fin2$AttCheck2.2[i]==2),
+                           na.rm=T)
+  }
+
+data.fin3 <- data.fin2[data.fin2$attn >= 3,]
+
+nrow(data.fin3) # final n = 231
+```		
+
+
+Data Analyses
+```{r}
+library(psych)
+## lecture 3 = E & N with sense of power, histograms of OCEAN
+	# reverse 
+		cor(data.fin3[,c('BFI1','BFI6','BFI11','BFI16','BFI21','BFI26',
+		'BFI27','BFI31','BFI36')],use='complete.obs') # need to recode
+		
+		cor(data.fin3[,c('BFI4','BFI9','BFI14','BFI19','BFI24','BFI29','BFI34','BFI39')],use='complete.obs')
+		
+		cor(data.fin3
+		    [,c('BFI5','BFI10','BFI15','BFI20','BFI25','BFI30','BFI40','BFI41','BFI44')],
+		    use='complete.obs')
+		
+		cor(data.fin3[,c('BFI3','BFI8','BFI13','BFI18','BFI23','BFI29','BFI34','BFI36',
+		'BFI39','BFI43')],use='complete.obs')
+		
+		cor(data.fin3[,c('BFI2','BFI7','BFI12','BFI17','BFI22','BFI32','BFI37','BFI42')],use='complete.obs')
+		
+		ocean <- c('BFI6','BFI21','BFI27','BFI31','BFI9','BFI24','BFI34','BFI41','BFI8','BFI18','BFI23',
+		'BFI29','BFI34','BFI39','BFI43','BFI2','BFI12','BFI37')
+		
+		for (i in 1:length(ocean)) {
+			data.fin3[,ocean[i]] <- 8 - data.fin3[,ocean[i]]
+		}
+	# scoring data
+		data.fin3$openness <- rowMeans(data.fin3[,c('BFI5','BFI10','BFI15','BFI20','BFI25','BFI30','BFI40',
+		'BFI41','BFI44')],na.rm=T)
+		
+		data.fin3$conscientiousness <- rowMeans(data.fin3[,c('BFI3','BFI8','BFI13','BFI18','BFI23','BFI29',
+		'BFI34','BFI36','BFI39','BFI43')],na.rm=T)
+		data.fin3$extraversion <- rowMeans(data.fin3[,c('BFI1','BFI6','BFI11','BFI16','BFI21','BFI26',
+	'BFI27','BFI31','BFI36')],na.rm=T)
+		data.fin3$agreeableness <- rowMeans(data.fin3[,c('BFI2','BFI7','BFI12','BFI17','BFI22','BFI32',
+		'BFI37','BFI42')],na.rm=T)
+		data.fin3$neuroticism <- rowMeans(data.fin3[,c('BFI4','BFI9','BFI14','BFI19','BFI24','BFI29',
+		'BFI34','BFI39')],na.rm=T)
+		# look at ladder cors
+			cor(data.fin3[,31:32],use='complete.obs') # .76 -> combine
+			data.fin3$ladder <- rowMeans(data.fin3[,31:32],na.rm=T)
+	# cors
+		library(Hmisc)
+		rcorr(as.matrix(data.fin3[,c('ladder','extraversion','neuroticism')]))
+	# hists
+for (i in 205:209) {
+  h <- hist(data.fin3[,i],main=colnames(data.fin3[i]),xlab=colnames(data.fin3[i]),col='lightblue',
+            breaks=20,xlim=c(1,7),ylim=c(0,50))
+  print(h)
+  text(paste0('Mean = ',round(mean(data.fin3[,i],na.rm=T),2)),x=6.5,y=(max(h$counts)-4))
+  text(paste0('SD = ',round(sd(data.fin3[,i],na.rm=T),2)),x=6.5,y=(max(h$counts)-5))
+  text(paste0('N = ',length(data.fin3[,i])),x=6.5,y=(max(h$counts)-6))
+  }	
+```
+
+
+```{r}
+####Lecture 6: 
+#histograms of attentional control
+#reverse-score ACS1, 2, 3, 4
+cor(data.fin3[,c('ACS1',"ACS2","ACS3","ACS4","ACS5","ACS6")],use='complete.obs')
+
+ACSr <- c('ACS1','ACS2','ACS3','ACS4')
+		
+for (i in 1:length(ACSr)) 
+  {
+  data.fin3[,ACSr[i]] <- 5 - data.fin3[,ACSr[i]]
+  }
+#create composite (sum and mean) for ACS
+data.fin3$ACSsum <- rowSums(data.fin3[,c('ACS1','ACS2','ACS3','ACS4','ACS5','ACS6')],na.rm=T)
+
+ACShist <- ggplot(data.fin3, aes(x=ACSsum)) +
+  geom_histogram(color = 'black', fill = 'khaki3', binwidth = 1) +
+  scale_x_continuous(name = "Attentional Control",
+                     breaks = seq(0,30,5),
+                     limits=c(5,25))+
+  scale_y_continuous(name = "Frequency") +
+  theme_bw(base_size = 2)
+ACShist
+ 
+
+#Correlations of attentional control with OCEAN
+rcorr(as.matrix(data.fin3[,c('ACSsum','extraversion','neuroticism','openness','agreeableness','conscientiousness')]))
+
+ACSline <- ggplot(data.fin3,aes(ACSsum,neuroticism))+
+  geom_smooth(method=lm)
+ACSline
+
+#Correlations of attentional control with test anxiety, GPA, self-efficacy
+cor(data.fin3[,c('TestAnx1','TestAnx2', 'TestAnx3','TestAnx4','TestAnx5','TestAnx6')],use='complete.obs')
+#need to reverse 4 and 5
+data.fin3$TestAnx4 <- 5 - data.fin3$TestAnx4
+data.fin3$TestAnx5 <- 5 - data.fin3$TestAnx5
+
+#create composite for test anxiety
+data.fin3$testanx.mn <- rowMeans(data.fin3[,c('TestAnx1','TestAnx2', 'TestAnx3','TestAnx4','TestAnx5','TestAnx6')],na.rm=T)
+
+data.fin3$GPAnum <- as.numeric(data.fin3$GPA)
+hist(data.fin3$GPAnum)
+min(data.fin3$GPAnum, na.rm = T)
+
+rcorr(as.matrix(data.fin3[,c('ACSsum','testanx.mn','GPAnum')]))
+
+
+#Correlations of attentional control with SE, life sat, depression
+corr.p(cor(data.fin3[,c('ACSsum','scc','se', 'authenticity')],use='complete.obs'),n=nrow(data.fin3))		
+rcorr(as.matrix(data.fin3[,c('ACSsum','scc','se', 'authenticity')]))
+
+# score depression & SWLS
+		round(cor(data.fin3[,89:108],use='complete.obs'),2) # 4, 8, 12, 16 reverse
+		data.fin3$CESD4 <- 5 - data.fin3$CESD4; data.fin3$CESD8 <- 5 - data.fin3$CESD8
+		data.fin3$CESD12 <- 5 - data.fin3$CESD12; data.fin3$CESD16 <- 5 - data.fin3$CESD16
+		round(cor(data.fin3[,89:108],use='complete.obs'),2) # beautiful
+		data.fin3$cesd <- rowMeans(data.fin3[,89:108],na.rm=T)
+		
+		round(cor(data.fin3[,139:143],use='complete.obs'),2)
+		data.fin3$swls <- rowMeans(data.fin3[,139:143],na.rm=T)
+
+		psych::describe(data.fin3[,c('cesd','swls')])
+		hist(data.fin3[,c('cesd','swls')],breaks=20)
+	# cors overall
+		rcorr(as.matrix(data.fin3[,c('ACSsum', 'cesd','swls')]))
+
+# by gender
+summary(lm(ACSsum ~ Gender,data=data.fin3[data.fin3$Gender %in% c(1,2),]))
+summary(lm(ACSsum ~ Gender+authenticity+Gender*authenticity,data=data.fin3[data.fin3$Gender %in% c(1,2),]))
+
+```
+
+```{r}
+## lecture 7 = birth order cors with big five
+	# birth order frequencies
+		table(data.fin3$BirthOrder) # mostly only childs, firsts, and seconds
+	# recode
+		# only + first vs. all else
+			data.fin3$birthO_v2 <- data.fin3$BirthOrder
+			data.fin3$birthO_v2[data.fin3$birthO_v2 == 1] <- 2 
+			
+table(data.fin3$birthO_v2)
+
+# correlations
+# only first and second
+rcorr(as.matrix(data.fin3[data.fin3$BirthOrder == c(2,3), c('BirthOrder','openness','conscientiousness', 'extraversion','agreeableness','neuroticism')]))
+		# all children: Only and first combined
+			rcorr(as.matrix(data.fin3[,c('birthO_v2','openness','conscientiousness',
+			'extraversion','agreeableness','neuroticism')])) 
+
+```
+
+```{r}
+## lecture 8 = attachment
+data.fin3$Attach
+	# frequencies on one-item essay
+		round(table(data.fin3$Attach)/nrow(data.fin3),2)
+	# cors w B5 (ECR-S, the short form)
+		# score ECR-S
+			# convert to numeric
+				ecr <- c(120:123,125:132)
+				for (i in 1:length(ecr)) {data.fin3[,ecr[i]] <- as.numeric(as.character(data.fin3[,ecr[i]]))}
+			# reversing items
+				revs <- c('ECR1','ECR5','ECR9','ECR8')
+				for (i in 1:length(revs)) {data.fin3[,revs[i]] <- 8 - data.fin3[,revs[i]]}
+				round(cor(data.fin3[,c(120:123,125:132)],use='complete.obs'),2)
+			# scoring the items 
+				data.fin3$avoidance <- rowMeans(data.fin3[,c('ECR1','ECR5','ECR9','ECR3','ECR11','ECR7')])
+				data.fin3$anxiety <- rowMeans(data.fin3[,c('ECR2','ECR4','ECR6','ECR8','ECR10','ECR12')])		
+			# means of avoidance and anxiety
+summary(data.fin3$avoidance)
+summary(data.fin3$anxiety)
+
+#histograms of avoidance and anxiety 
+av.hist <- ggplot(data.fin3, aes(avoidance)) + 
+  geom_histogram(breaks=seq(0,7, by=.5),
+                 col="black",
+                 fill = "beige") + 
+  
+  theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.y  = element_text(size=20),
+        axis.text.x  = element_text(size=20))
+
+av.hist
+
+ax.hist <- ggplot(data.fin3, aes(anxiety)) + 
+  geom_histogram(breaks=seq(0,7, by=.5),
+                 col="black",
+                 fill = "beige") + 
+  
+  theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.y  = element_text(size=20),
+        axis.text.x  = element_text(size=20))
+
+ax.hist
+		# actual cors	
+			rcorr(as.matrix(data.fin3[,c(212:213,205:209,219:220)]))			
+```
+
+```{r}
+## lecture 11 = self-structure & organization
+	# scc, se, & authenticity
+		colnames(data.fin3) # auth = 40:43, scc = 144:151 + 153:156, se = 157:160 + 162:167				
+		cor(data.fin3[,40:43],use='complete.obs') # recode
+		cor(data.fin3[,c(144:151,153:156)],use='complete.obs')
+		cor(data.fin3[,c(157:160,162:167)],use='complete.obs')		
+	# reverse scores
+		revs <- c(42,43,144:148,150:151,153:154,156,159,162,165:167)			
+		for (i in 1:length(revs)){data.fin3[,revs[i]] <- (max(data.fin3[,revs[i]],na.rm=T)+1) - data.fin3[,revs[i]]}
+	
+		# alphas
+alpha(data.fin3[,40:43]) # .74		
+		alpha(data.fin3[,c(144:151,153:156)]) # .88		
+		alpha(data.fin3[,c(157:160,162:167)]) # .92	
+	# score data
+		data.fin3$authenticity <- rowMeans(data.fin3[,40:43],na.rm=T)
+		data.fin3$scc <- rowMeans(data.fin3[,c(144:151,153:156)],na.rm=T)
+		data.fin3$se <- rowMeans(data.fin3[,c(157:160,162:167)],na.rm=T)	
+	# cors			
+		corr.p(cor(data.fin3[,c('scc','se','authenticity')],use='complete.obs'),n=nrow(data.fin3))		
+	# histogram of scc (+ descriptives)
+		describe(data2[,c('scc','se','authenticity')])
+		(h <- hist(data2$scc,breaks=20,main='Histogram',xlab='Self-Concept Clarity',probability=T,ylab="Proportion of Scores"))
+		lines(density(data2$scc,adjust=2),lwd=2)
+		text(paste0('Mean = ',round(mean(data2$scc,na.rm=T),2)),x=5.5,y=(max(h$density)-.05))
+		text(paste0('SD = ',round(sd(data2$scc,na.rm=T),2)),x=5.5,y=(max(h$density)-.07))
+		text(paste0('N = ',length(data2$scc)),x=5.5,y=(max(h$density)-.09))
+	# cors w big5
+		corr.p(cor(data2[,c('scc','openness','conscientiousness','extraversion','agreeableness',
+		'neuroticism')],use='complete.obs'),n=nrow(data2))
+		corr.p(partial.r(data2[,c('scc','openness','conscientiousness','extraversion','agreeableness',
+		'neuroticism','se')],x=1:6,y=7),n=nrow(data2))
+	# IOS cors
+		corr.p(cor(data2[,c('IOSa','openness','conscientiousness','extraversion','agreeableness',
+		'neuroticism')],use='complete.obs'),n=nrow(data2))
+		by(data2$IOSa,list(factor(data2$IOSb)),mean)
+		by(data2$IOSa,list(factor(data2$Attach)),mean)
+```
+
+
+```{r}
+## lecture 14 = performance vs. mastery
+	# reverse score IT measure
+		data2$IT1 <- 8 - data2$IT1; data2$IT3 <- 8 - data2$IT3; data2$IT4 <- 8 - data2$IT4
+		cor(data2[,c('IT1','IT2','IT3','IT4')],use='complete.obs')
+		psych::alpha(data2[,c('IT1','IT2','IT3','IT4')])
+		print(factanal(covmat=cov(data2[,c('IT1','IT2','IT3','IT4')],use='complete.obs'),
+		factors=1,rotation='none'),cutoff=0)
+		data2$itAvg <- rowMeans(data2[,c('IT1','IT2','IT3','IT4')],na.rm=T)
+	# corrs w B5
+		rcorr(as.matrix(data2[,c('itAvg','extraversion','conscientiousness','openness','agreeableness',
+		'neuroticism')]))
+	# read & merge grade data
+		grades <- read.csv('~/Desktop/GSI Docs/PSYCH150_fa17/lect14_grades.csv',stringsAsFactors=F)
+		colnames(grades)
+		for (i in 10:20) {grades[,i] <- as.numeric(grades[,i])}
+		data2$sid <- data2$Intro_2_TEXT; grades$sid <- grades$SIS.User.ID
+		allDat <- merge(data2,grades,by='sid')
+		allDat$exam12diff <- allDat$Exam.2.Final.Score - allDat$Exam.1.Final.Score
+	# corrs w grades
+		rcorr(as.matrix(allDat[,c('itAvg','Exam.1.Final.Score','Exam.2.Final.Score','exam12diff')]))
+	# checking for outliers
+		plot(scale(allDat$itAvg),scale(allDat$Exam.1.Final.Score)) # nothing
+		plot(scale(allDat$itAvg),scale(allDat$Exam.2.Final.Score)) # yes, outlier = didnt take exam
+		round(cor(allDat[allDat$Exam.2.Final.Score>0 & allDat$Exam.1.Final.Score>0,
+		c('itAvg','Exam.2.Final.Score','exam12diff')]),2)
+		plot(scale(allDat$itAvg),scale(allDat$exam12diff))
+		plot(allDat$exam12diff[allDat$Exam.2.Final.Score>0]) # most people did worse, if they took exam 2
+		plot(allDat$itAvg[allDat$Exam.2.Final.Score>0],allDat$exam12diff[allDat$Exam.2.Final.Score>0])
+			# mostly random, but some score improvements along lower end of IT scale
+			abline(lm(exam12diff ~ itAvg,data=allDat[allDat$Exam.2.Final.Score>0,])) # line fits
+		'Summary: Removing people who havent taken Exam 2 removes correlation between IT and Exam 2. 
+		 The correlation between IT and the difference between Exam 2 and Exam 1 remains, however.'	
+	# new grades
+		grades <- read.csv('~/Desktop/GSI Docs/PSYCH150_fa17/lect15_grades.csv',stringsAsFactors=F)
+		colnames(grades)
+		for (i in 10:20) {grades[,i] <- as.numeric(grades[,i])}
+		grades$sid <- grades$SIS.User.ID
+		allDat <- merge(data2,grades,by='sid')
+		allDat$exam12diff_2 <- allDat$Exam.2.Final.Score - allDat$Exam.1.Final.Score
+		corr.p(cor(allDat[,c('itAvg','exam12diff_2')],use='complete.obs'),n=nrow(allDat[!is.na(allDat$itAvg) &
+		!is.na(allDat$exam12diff_2),]))
+```
+
+```{r}
+## lecture 16 = emotion regulation
+	# score ERQ
+		colname(data2)
+		round(cor(data2[,c('ERQ1','ERQ3','ERQ5','ERQ7','ERQ8','ERQ10')],use='complete.obs'),2)
+		round(cor(data2[,c('ERQ2','ERQ4','ERQ6','ERQ9')],use='complete.obs'),2)
+		data2$reappraisal <- rowMeans(data2[,c('ERQ1','ERQ3','ERQ5','ERQ7','ERQ8','ERQ10')],na.rm=T)	
+		data2$suppression <- rowMeans(data2[,c('ERQ2','ERQ4','ERQ6','ERQ9')],na.rm=T)
+		psych::describe(data2[,c('reappraisal','suppression')])
+		hist(data2[,c('reappraisal','suppression')],breaks=20)
+	# score depression & SWLS
+		round(cor(data2[,89:108],use='complete.obs'),2) # 4, 8, 12, 16 reverse
+		data2$CESD4 <- 5 - data2$CESD4; data2$CESD8 <- 5 - data2$CESD8
+		data2$CESD12 <- 5 - data2$CESD12; data2$CESD16 <- 5 - data2$CESD16
+		round(cor(data2[,89:108],use='complete.obs'),2) # beautiful
+		data2$cesd <- rowMeans(data2[,89:108],na.rm=T)
+		
+		round(cor(data2[,139:143],use='complete.obs'),2)
+		data2$swls <- rowMeans(data2[,139:143],na.rm=T)
+
+		psych::describe(data2[,c('cesd','swls')])
+		hist(data2[,c('cesd','swls')],breaks=20)
+	# cors overall
+		rcorr(as.matrix(data2[,c(219:222,205:209)]))
+	# cors by race
+		rcorr(as.matrix(data2[data2$Ethnicity_1 == 1,c(219:222,205:209)]))
+		rcorr(as.matrix(data2[data2$Ethnicity_4 == 1 | data2$Ethnicity_5 == 1 | 
+			data2$Ethnicity_6 == 1,c(219:222,205:209)]))
+		rcorr(as.matrix(data2[is.na(data2$Ethnicity_1),c(219:222,205:209)]))	
+	# mean comp by race
+		t.test(data2$reappraisal[data2$Ethnicity_1==1],data2$reappraisal[is.na(data2$Ethnicity_1)])
+		t.test(data2$suppression[data2$Ethnicity_1==1],data2$suppression[is.na(data2$Ethnicity_1)])
+		data2$white <- 1; data2$white[is.na(data2$Ethnicity_1)] <- 0
+		by(data2[,c('reappraisal','suppression')],list(data2$white),psych::describe)
+	# mean comp by gender
+		summary(lm(reappraisal ~ Gender,data=data2[data2$Gender %in% c(1,2),]))
+		summary(lm(suppression ~ Gender,data=data2[data2$Gender %in% c(1,2),]))
+		by(data2[,c('reappraisal','suppression')],list(data2$Gender),psych::describe)
+	# mean comp by firstborn
+		t.test(data2$suppression[data2$birthO_v2==2],data2$suppression[data2$birthO_v2==3])
+		t.test(data2$reappraisal[data2$birthO_v2==2],data2$reappraisal[data2$birthO_v2==3])
+
+```
+
+
+
+End of semester
+```{r}
+## export final SIDs
+	#write.csv(data2$Intro_2_TEXT,'~/Desktop/GSI Docs/PSYCH150_fa17/finalSIDs.csv')
+	## figuring out end of term grades
+		grades <- read.csv('~/Desktop/GSI Docs/PSYCH150_fa17/penFin_grades.csv',stringsAsFactors=F)
+		sids <- read.csv('~/Desktop/GSI Docs/PSYCH150_fa17/finalSIDs.csv',stringsAsFactors=F)
+		colnames(grades); colnames(sids)
+		grades$SIS.User.ID
+		sids$x
+		grades$Start.of.term.Survey..7851380. <- 0
+		grades$Start.of.term.Survey..7851380.[grades$SIS.User.ID %in% sids$x] <- 1
+	## attendance for my sections
+		library(gdata)
+		attend <- read.xls('~/Desktop/GSI Docs/PSYCH150_fa17/attendance.xlsx',sheet=1)
+		head(attend$Section); head(grades$Section)
+		grades$Section.Attendance..7851059.
+		stephen <- which(is.na(grades$Section.Attendance..7851059.) & 
+			(grepl('104',grades$Section) | grepl('105',grades$Section) | grepl('106',grades$Section)))
+		grades$Section.Attendance..7851059.[stephen] <- attend$total[attend$SIS.User.ID %in% 
+			grades$SIS.User.ID[stephen]]
+		grades$Section.Attendance..7851059.[grades$Section.Attendance..7851059. > 8] <- 8
+	## tophat
+		tophat <- read.csv('~/Desktop/GSI Docs/PSYCH150_fa17/tophat.csv',stringsAsFactors=F)
+		colnames(tophat); str(tophat)
+		grades$SIS.User.ID %in% tophat$student_id	
+		for (i in 2:nrow(grades)) {
+			if (grades$SIS.User.ID[i] %in% tophat$student_id) {
+				grades$Tophat..7851379.[i] <- 
+					tophat$participation_grade[which(tophat$student_id == grades$SIS.User.ID[i])]
+			}}
+		grades$Tophat..7851379.
+		grades$Tophat..7851379.[grades$Tophat..7851379. > 68] <- 68		
+	## export
+		for (i in 2:nrow(grades)) {for (j in 1:ncol(grades)) {if (is.na(grades[i,j])) {grades[i,j] <- ''}}}
+		write.csv(grades,'~/Desktop/GSI Docs/PSYCH150_fa17/finGrades_stephen2.csv')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			
+				
+				
